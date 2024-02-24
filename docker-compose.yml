@@ -1,0 +1,14 @@
+version: '3.9'
+services:
+  poi:
+    build:
+      context: .
+      dockerfile: source/POI.DiscordDotNet.Dockerfile
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - 5001:5432
+    volumes:
+      - ./db:/var/lib/postgresql/data
