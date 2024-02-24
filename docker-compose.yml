@@ -3,7 +3,7 @@ services:
   poi:
     build:
       context: .
-      dockerfile: source/POI.DiscordDotNet.Dockerfile
+      dockerfile: source/POI.DiscordDotNet/Dockerfile
     depends_on:
       - postgres
     environment:
