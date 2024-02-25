@@ -7,10 +7,10 @@ services:
     depends_on:
       - postgres
     environment:
-      - ConnectionStrings:PostgreSQL=$ConnectionStrings:PostgreSQL
-      - Discord:Prefix=$Discord:Prefix
-      - Discord:Token=$Discord:Token
-      - Paths:DataFolderPath=$Paths:DataFolderPath
+      - ConnectionStrings:PostgreSQL=$ConnectionStringsPostgreSQL
+      - Discord:Prefix=$DiscordPrefix
+      - Discord:Token=$DiscordToken
+      - Paths:DataFolderPath=$PathsDataFolderPath
   postgres:
     image: postgres:16-alpine
     ports:
