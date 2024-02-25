@@ -7,11 +7,13 @@ services:
       dockerfile: source/POI.DiscordDotNet/Dockerfile
     depends_on:
       - postgres
+    volumes:
+        - ./poi-data:/var/lib/poi/data
     environment:
       - ConnectionStrings:PostgreSQL=$ConnectionStringsPostgreSQL
       - Discord:Prefix=$DiscordPrefix
       - Discord:Token=$DiscordToken
-      - Paths:DataFolderPath=$PathsDataFolderPath
+      - Paths:DataFolderPath=/var/lib/poi/data
   postgres:
     image: postgres:16-alpine
     ports:
