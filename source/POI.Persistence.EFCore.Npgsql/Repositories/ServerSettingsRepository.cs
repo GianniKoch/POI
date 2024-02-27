@@ -22,4 +22,14 @@ internal class ServerSettingsRepository : IServerSettingsRepository
 			.FirstOrDefaultAsync(x => x.ServerId == serverId, cts)
 			.ConfigureAwait(false);
 	}
+
+	public async Task<IEnumerable<ulong>> FindAllServerIds()
+	{
+		await using var context = await _appDbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+		return await context.ServerSettings
+			.AsNoTracking()
+			.Select(x => x.ServerId)
+			.ToListAsync()
+			.ConfigureAwait(false);
+	}
 }

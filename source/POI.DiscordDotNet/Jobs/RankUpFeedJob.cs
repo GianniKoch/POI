@@ -25,15 +25,17 @@ namespace POI.DiscordDotNet.Jobs
 
 		private readonly string[] _countryDefinition = { "BE" };
 		private readonly string[] _profileRefreshExclusions = Array.Empty<string>();
+		private readonly IServerSettingsRepository _serverSettingsRepository;
 
 		public RankUpFeedJob(ILogger<RankUpFeedJob> logger, IDiscordClientProvider discordClientProviderProvider, IScoreSaberApiService scoreSaberApiService,
-			IGlobalUserSettingsRepository globalUserSettingsRepository, ILeaderboardEntriesRepository leaderboardEntriesRepository)
+			IGlobalUserSettingsRepository globalUserSettingsRepository, ILeaderboardEntriesRepository leaderboardEntriesRepository, IServerSettingsRepository serverSettingsRepository)
 		{
 			_logger = logger;
 			_discordClientProvider = discordClientProviderProvider;
 			_scoreSaberApiService = scoreSaberApiService;
 			_globalUserSettingsRepository = globalUserSettingsRepository;
 			_leaderboardEntriesRepository = leaderboardEntriesRepository;
+			_serverSettingsRepository = serverSettingsRepository;
 		}
 
 		public async Task Execute(IJobExecutionContext context)
@@ -45,15 +47,8 @@ namespace POI.DiscordDotNet.Jobs
 				return;
 			}
 
+			var settings = await _serverSettingsRepository.FindAllServerIds().ConfigureAwait(false);
 			var allScoreSaberLinks = await _globalUserSettingsRepository.GetAllScoreSaberAccountLinks().ConfigureAwait(false);
-			var guild = await _discordClientProvider.Client.GetGuildAsync(561207570669371402, true).ConfigureAwait(false);
-
-			var members = await guild.GetAllMembersAsync();
-			if (members == null)
-			{
-				return;
-			}
-
 			var playersWrappers = await Task.WhenAll(Enumerable
 				.Range(1, TOP / 50)
 				.Select(page => _scoreSaberApiService.FetchPlayers((uint) page, countries: _countryDefinition)));
@@ -62,22 +57,45 @@ namespace POI.DiscordDotNet.Jobs
 				return;
 			}
 
-			var roles = OrderTopRoles(guild.Roles.Where(x => x.Value.Name.Contains("(Top ", StringComparison.Ordinal)));
 			var players = playersWrappers
 				.SelectMany(wrapper => wrapper!.Players)
 				.Where(player => player.Pp > 0 && player.Rank > 0)
 				.ToList();
+
+			var originalLeaderboardEntries = await _leaderboardEntriesRepository.GetAll().ConfigureAwait(false);
+
+			foreach (var guildId in settings)
+			{
+				var guild = await _discordClientProvider.Client.GetGuildAsync(guildId, true).ConfigureAwait(false);
+				if (guild == null)
+				{
+					_logger.LogWarning("Guild with id {GuildId} not found", guildId);
+					continue;
+				}
+
+				await HandleGuild(guild, allScoreSaberLinks, players, originalLeaderboardEntries);
+			}
+
+			await _leaderboardEntriesRepository.DeleteAll().ConfigureAwait(false);
+			await _leaderboardEntriesRepository.Insert(players.Select(p => new LeaderboardEntry(p.Id, p.Name, p.CountryRank, p.Pp))).ConfigureAwait(false);
+		}
+
+		private async Task HandleGuild(DiscordGuild guild, List<ScoreSaberAccountLink> allScoreSaberLinks, List<ExtendedBasicProfileDto> players, List<LeaderboardEntry> originalLeaderboardEntries)
+		{
+			var members = await guild.GetAllMembersAsync();
+			if (members == null)
+			{
+				return;
+			}
+
+			var roles = OrderTopRoles(guild.Roles.Where(x => x.Value.Name.Contains("(Top ", StringComparison.Ordinal)));
+
 			foreach (var player in players)
 			{
 				await HandlePlayer(player, allScoreSaberLinks, members, roles);
 			}
 
-
-			var originalLeaderboardEntries = await _leaderboardEntriesRepository.GetAll().ConfigureAwait(false);
 			await PostChangesOnDiscord(guild, originalLeaderboardEntries, players);
-
-			await _leaderboardEntriesRepository.DeleteAll().ConfigureAwait(false);
-			await _leaderboardEntriesRepository.Insert(players.Select(p => new LeaderboardEntry(p.Id, p.Name, p.CountryRank, p.Pp))).ConfigureAwait(false);
 		}
 
 		private async Task HandlePlayer(ProfileBaseDto player,
@@ -171,25 +189,34 @@ namespace POI.DiscordDotNet.Jobs
 			return applicableRole;
 		}
 
-		private static async Task PostChangesOnDiscord(DiscordGuild guild, IReadOnlyCollection<LeaderboardEntry> originalLeaderboardEntries, List<ExtendedBasicProfileDto> players)
+		private async Task PostChangesOnDiscord(DiscordGuild guild, IReadOnlyCollection<LeaderboardEntry> originalLeaderboardEntries, List<ExtendedBasicProfileDto> players)
 		{
-			var rankedUpPlayers = DetermineRankedUpPlayers(originalLeaderboardEntries, players);
-
-			var rankUpFeedChannel = guild.GetChannel(634091663526199307);
-			if (rankUpFeedChannel != null)
+			var settings = await _serverSettingsRepository.FindOneById(guild.Id);
+			if (settings == null)
 			{
-				foreach (var player in rankedUpPlayers)
-				{
-					var rankUpEmbed = new DiscordEmbedBuilder()
-						.WithPoiColor()
-						.WithTitle($"Well done, {player.Name}")
-						.WithUrl($"https://scoresaber.com/u/{player.Id}")
-						.WithThumbnail(player.ProfilePicture)
-						.WithDescription($"{player.Name} is now rank **#{player.CountryRank}** of the BE beat saber players with a total pp of **{player.Pp}**")
-						.Build();
+				_logger.LogWarning("No settings found for guild {GuildId}", guild.Id);
+				return;
+			}
 
-					await rankUpFeedChannel.SendMessageAsync(rankUpEmbed).ConfigureAwait(false);
-				}
+			var rankedUpPlayers = DetermineRankedUpPlayers(originalLeaderboardEntries, players);
+			var rankUpFeedChannel = guild.GetChannel((ulong) settings.RankUpFeedChannelId!);
+			if (rankUpFeedChannel == null)
+			{
+				_logger.LogWarning("No rank up feed channel found for guild {GuildId}", guild.Id);
+				return;
+			}
+
+			foreach (var player in rankedUpPlayers)
+			{
+				var rankUpEmbed = new DiscordEmbedBuilder()
+					.WithPoiColor()
+					.WithTitle($"Well done, {player.Name}")
+					.WithUrl($"https://scoresaber.com/u/{player.Id}")
+					.WithThumbnail(player.ProfilePicture)
+					.WithDescription($"{player.Name} is now rank **#{player.CountryRank}** of the BE beat saber players with a total pp of **{player.Pp}**")
+					.Build();
+
+				await rankUpFeedChannel.SendMessageAsync(rankUpEmbed).ConfigureAwait(false);
 			}
 		}
 
