@@ -2,9 +2,7 @@ version: '3.9'
 
 services:
   poi:
-    build:
-      context: .
-      dockerfile: source/POI.DiscordDotNet/Dockerfile
+    image: giannikoch/poi:latest
     depends_on:
       - postgres
     volumes:
