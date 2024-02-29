@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   poi:
-    image: ghcr.io/giannikoch/poi:maint
+    image: ghcr.io/giannikoch/poi:main
     depends_on:
       - postgres
     volumes:
