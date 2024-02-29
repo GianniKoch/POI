@@ -25,4 +25,4 @@ services:
 
 networks:
   default:
-    driver: overlay
+    driver: bridge
