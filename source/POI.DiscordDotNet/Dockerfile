@@ -1,6 +1,4 @@
-﻿FROM mcr.microsoft.com/dotnet/runtime:7.0 AS base
-RUN sed -i'.bak' 's/$/ contrib/' /etc/apt/sources.list
-RUN apt-get update; apt-get install -y ttf-mscorefonts-installer fontconfig
+﻿FROM --platform=arm64 mcr.microsoft.com/dotnet/runtime:7.0 AS base
 WORKDIR /app
 
 FROM --platform=arm64 mcr.microsoft.com/dotnet/sdk:7.0 AS build
