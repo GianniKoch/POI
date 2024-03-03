@@ -1,7 +1,7 @@
-﻿FROM --platform=arm64 mcr.microsoft.com/dotnet/runtime:7.0 AS base
+﻿FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/runtime:7.0 AS base
 WORKDIR /app
 
-FROM --platform=arm64 mcr.microsoft.com/dotnet/sdk:7.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["source/POI.DiscordDotNet/POI.DiscordDotNet.csproj", "source/POI.DiscordDotNet/"]
