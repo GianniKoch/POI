@@ -1,9 +1,9 @@
-﻿FROM mcr.microsoft.com/dotnet/runtime:7.0 AS base
+﻿FROM mcr.microsoft.com/dotnet/runtime:8.0 AS base
 RUN sed -i'.bak' 's/$/ contrib/' /etc/apt/sources.list
 RUN apt-get update; apt-get install -y ttf-mscorefonts-installer fontconfig
 WORKDIR /app
 
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:7.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["source/POI.DiscordDotNet/POI.DiscordDotNet.csproj", "source/POI.DiscordDotNet/"]
