@@ -25,15 +25,17 @@ namespace POI.DiscordDotNet.Jobs
 
 		private readonly string[] _countryDefinition = { "BE" };
 		private readonly string[] _profileRefreshExclusions = Array.Empty<string>();
+		private readonly IServerSettingsRepository _serverSettingsRepository;
 
 		public RankUpFeedJob(ILogger<RankUpFeedJob> logger, IDiscordClientProvider discordClientProviderProvider, IScoreSaberApiService scoreSaberApiService,
-			IGlobalUserSettingsRepository globalUserSettingsRepository, ILeaderboardEntriesRepository leaderboardEntriesRepository)
+			IGlobalUserSettingsRepository globalUserSettingsRepository, ILeaderboardEntriesRepository leaderboardEntriesRepository, IServerSettingsRepository serverSettingsRepository)
 		{
 			_logger = logger;
 			_discordClientProvider = discordClientProviderProvider;
 			_scoreSaberApiService = scoreSaberApiService;
 			_globalUserSettingsRepository = globalUserSettingsRepository;
 			_leaderboardEntriesRepository = leaderboardEntriesRepository;
+			_serverSettingsRepository = serverSettingsRepository;
 		}
 
 		public async Task Execute(IJobExecutionContext context)
@@ -45,15 +47,6 @@ namespace POI.DiscordDotNet.Jobs
 				return;
 			}
 
-			var allScoreSaberLinks = await _globalUserSettingsRepository.GetAllScoreSaberAccountLinks().ConfigureAwait(false);
-			var guild = await _discordClientProvider.Client.GetGuildAsync(561207570669371402, true).ConfigureAwait(false);
-
-			var members = await guild.GetAllMembersAsync();
-			if (members == null)
-			{
-				return;
-			}
-
 			var playersWrappers = await Task.WhenAll(Enumerable
 				.Range(1, TOP / 50)
 				.Select(page => _scoreSaberApiService.FetchPlayers((uint) page, countries: _countryDefinition)));
@@ -62,11 +55,43 @@ namespace POI.DiscordDotNet.Jobs
 				return;
 			}
 
-			var roles = OrderTopRoles(guild.Roles.Where(x => x.Value.Name.Contains("(Top ", StringComparison.Ordinal)));
 			var players = playersWrappers
 				.SelectMany(wrapper => wrapper!.Players)
 				.Where(player => player.Pp > 0 && player.Rank > 0)
 				.ToList();
+
+			var allScoreSaberLinks = await _globalUserSettingsRepository.GetAllScoreSaberAccountLinks().ConfigureAwait(false);
+
+			foreach (var serverSetting in await _serverSettingsRepository.GetRankUpFeedChannels().ConfigureAwait(false))
+			{
+				await HandleGuild(serverSetting, players, allScoreSaberLinks);
+			}
+
+			await _leaderboardEntriesRepository.DeleteAll().ConfigureAwait(false);
+			await _leaderboardEntriesRepository.Insert(players.Select(p => new LeaderboardEntry(p.Id, p.Name, p.CountryRank, p.Pp))).ConfigureAwait(false);
+		}
+
+		private async Task HandleGuild(ServerSettings serverSetting, List<ExtendedBasicProfileDto> players, List<ScoreSaberAccountLink> allScoreSaberLinks)
+		{
+			DiscordGuild guild;
+			try
+			{
+				guild = await _discordClientProvider.Client!.GetGuildAsync(serverSetting.ServerId, true).ConfigureAwait(false);
+			}
+			catch (DSharpPlus.Exceptions.NotFoundException e)
+			{
+				_logger.LogError(e, "Failed to get guild {GuildId} in RankUpFeed Job", serverSetting.ServerId);
+				return;
+			}
+
+			var members = await guild.GetAllMembersAsync();
+			if (members == null)
+			{
+				return;
+			}
+
+			var roles = OrderTopRoles(guild.Roles.Where(x => x.Value.Name.Contains("(Top ", StringComparison.Ordinal)));
+
 			foreach (var player in players)
 			{
 				await HandlePlayer(player, allScoreSaberLinks, members, roles);
@@ -74,10 +99,7 @@ namespace POI.DiscordDotNet.Jobs
 
 
 			var originalLeaderboardEntries = await _leaderboardEntriesRepository.GetAll().ConfigureAwait(false);
-			await PostChangesOnDiscord(guild, originalLeaderboardEntries, players);
-
-			await _leaderboardEntriesRepository.DeleteAll().ConfigureAwait(false);
-			await _leaderboardEntriesRepository.Insert(players.Select(p => new LeaderboardEntry(p.Id, p.Name, p.CountryRank, p.Pp))).ConfigureAwait(false);
+			await PostChangesOnDiscord(guild, originalLeaderboardEntries, players, serverSetting.RankUpFeedChannelId!.Value);
 		}
 
 		private async Task HandlePlayer(ProfileBaseDto player,
@@ -171,11 +193,12 @@ namespace POI.DiscordDotNet.Jobs
 			return applicableRole;
 		}
 
-		private static async Task PostChangesOnDiscord(DiscordGuild guild, IReadOnlyCollection<LeaderboardEntry> originalLeaderboardEntries, List<ExtendedBasicProfileDto> players)
+		private static async Task PostChangesOnDiscord(DiscordGuild guild, IReadOnlyCollection<LeaderboardEntry> originalLeaderboardEntries, List<ExtendedBasicProfileDto> players,
+			ulong rankUpFeedChannelId)
 		{
 			var rankedUpPlayers = DetermineRankedUpPlayers(originalLeaderboardEntries, players);
 
-			var rankUpFeedChannel = guild.GetChannel(634091663526199307);
+			var rankUpFeedChannel = guild.GetChannel(rankUpFeedChannelId);
 			if (rankUpFeedChannel != null)
 			{
 				foreach (var player in rankedUpPlayers)
