@@ -22,4 +22,13 @@ internal class ServerSettingsRepository : IServerSettingsRepository
 			.FirstOrDefaultAsync(x => x.ServerId == serverId, cts)
 			.ConfigureAwait(false);
 	}
+
+	public async Task<List<ServerSettings>> GetRankUpFeedChannels(CancellationToken cts)
+	{
+		await using var context = await _appDbContextFactory.CreateDbContextAsync(cts).ConfigureAwait(false);
+		return context.ServerSettings
+			.AsNoTracking()
+			.Where(s => s.RankUpFeedChannelId != null)
+			.ToList();
+	}
 }
