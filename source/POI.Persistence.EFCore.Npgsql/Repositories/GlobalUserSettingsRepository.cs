@@ -97,4 +97,17 @@ internal class GlobalUserSettingsRepository : IGlobalUserSettingsRepository
 
 		await context.SaveChangesAsync(cts).ConfigureAwait(false);
 	}
+
+	public async Task<GlobalUserSettings?> GetByScoreSaberId(string scoreSaberId, CancellationToken cts)
+	{
+		await using var context = await _appDbContextFactory.CreateDbContextAsync(cts);
+		return await context.GlobalUserSettings.SingleOrDefaultAsync(g => g.ScoreSaberId == scoreSaberId, cts);
+	}
+
+	public async Task DeleteAsync(GlobalUserSettings existingUserSetting, CancellationToken cts = default)
+	{
+		await using var context = await _appDbContextFactory.CreateDbContextAsync(cts);
+		context.GlobalUserSettings.Remove(existingUserSetting);
+		await context.SaveChangesAsync(cts);
+	}
 }

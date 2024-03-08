@@ -118,9 +118,16 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 			return scoreSaberId;
 		}
 
-		protected Task CreateScoreLink(ulong discordId, string scoreSaberId)
+		protected async Task CreateScoreLink(ulong discordId, string scoreSaberId)
 		{
-			return GlobalUserSettingsRepository.CreateOrUpdateScoreSaberLink(discordId, scoreSaberId);
+			var existingUserSetting = await GlobalUserSettingsRepository.GetByScoreSaberId(scoreSaberId);
+
+			if(existingUserSetting != null)
+			{
+				await GlobalUserSettingsRepository.DeleteAsync(existingUserSetting);
+			}
+
+			await GlobalUserSettingsRepository.CreateOrUpdateScoreSaberLink(discordId, scoreSaberId);
 
 			// TODO: Role assignment logic (Preferably call into service)
 		}
