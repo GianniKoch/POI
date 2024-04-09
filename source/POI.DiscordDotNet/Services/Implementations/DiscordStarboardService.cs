@@ -61,9 +61,15 @@ public class DiscordStarboardService : IAddDiscordClientFunctionality
 			return;
 		}
 
+		// Skip event if the message is before the ignore threshold
+		var message = args.Message;
+		if(args.Message.CreationTimestamp < (serverSettings.StarboardMessageIgnoreAfter ?? DateTimeOffset.UtcNow))
+		{
+			_logger.LogInformation("Message was starred before the threshold, ignoring.");
+			return;
+		}
 
 		// Check if the message reactions contains the star emote
-		var message = args.Message;
 		if (message.Reactions.All(x => x.Emoji.Name != "⭐"))
 		{
 			return;

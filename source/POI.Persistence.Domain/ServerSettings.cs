@@ -14,7 +14,9 @@
 
 		public uint? StarboardEmojiCount { get; set; }
 
-		public ServerSettings(ulong serverId, ulong? rankUpFeedChannelId = null, ulong? birthdayRoleId = null, ulong? starboardChannelId = null, ulong? eventsChannelId = null, uint? starboardEmojiCount = null)
+		public DateTimeOffset? StarboardMessageIgnoreAfter { get; set; }
+
+		public ServerSettings(ulong serverId, ulong? rankUpFeedChannelId = null, ulong? birthdayRoleId = null, ulong? starboardChannelId = null, ulong? eventsChannelId = null, uint? starboardEmojiCount = null, DateTimeOffset? starboardMessageIgnoreAfter = null)
 		{
 			ServerId = serverId;
 			RankUpFeedChannelId = rankUpFeedChannelId;
@@ -22,6 +24,7 @@
 			StarboardChannelId = starboardChannelId;
 			EventsChannelId = eventsChannelId;
 			StarboardEmojiCount = starboardEmojiCount;
+			StarboardMessageIgnoreAfter = starboardMessageIgnoreAfter;
 		}
 	}
 }

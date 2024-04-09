@@ -1,6 +1,7 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -114,12 +115,24 @@ var host = Host.CreateDefaultBuilder()
 					tp.MaxConcurrency = 5;
 				});
 
+				var timeZoneId = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "Romance Standard Time" : "Europe/Brussels";
+				TimeZoneInfo? belgiumTimeZone;
+				try
+				{
+					belgiumTimeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+				}
+				catch (TimeZoneNotFoundException)
+				{
+					Log.Error("Timezone {TimeZoneId} not found on this system", timeZoneId);
+					throw;
+				}
+
 				q.ScheduleJob<RankUpFeedJob>(trigger => trigger
 					.WithIdentity("RankUpFeed Trigger")
 					.WithSchedule(CronScheduleBuilder.CronSchedule("0 0/5 * * * ?")));
 				q.ScheduleJob<BirthdayGirlsJob>(trigger => trigger
 					.WithIdentity("Birthday Girl trigger")
-					.WithCronSchedule(CronScheduleBuilder.DailyAtHourAndMinute(0, 0)));
+					.WithCronSchedule(CronScheduleBuilder.DailyAtHourAndMinute(0, 0).InTimeZone(belgiumTimeZone)));
 			})
 			.AddQuartzHostedService(options =>
 			{
