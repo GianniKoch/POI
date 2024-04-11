@@ -1,4 +1,5 @@
-﻿using DSharpPlus.Entities;
+﻿using System.Runtime.InteropServices;
+using DSharpPlus.Entities;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using NodaTime;
@@ -34,7 +35,21 @@ namespace POI.DiscordDotNet.Jobs
 				return;
 			}
 
-			var localDate = LocalDate.FromDateTime(context.ScheduledFireTimeUtc?.LocalDateTime ?? DateTime.Today);
+			var timeZoneId = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "Romance Standard Time" : "Europe/Brussels";
+			TimeZoneInfo? belgiumTimeZone;
+			try
+			{
+				belgiumTimeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+			}
+			catch (TimeZoneNotFoundException)
+			{
+				_logger.LogError("Timezone {TimeZoneId} not found on this system", timeZoneId);
+				throw;
+			}
+
+			var localDate = LocalDate.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(context.ScheduledFireTimeUtc?.LocalDateTime ?? DateTime.Today, belgiumTimeZone));
+			//var localDate = LocalDate.FromDateTime(context.ScheduledFireTimeUtc?.LocalDateTime ?? DateTime.Today);
+
 			_logger.LogInformation("Looking up birthday party people using date: {Date}", localDate.ToString());
 			var currentBirthdayPartyPeople = await _globalUserSettingsRepository.GetAllBirthdayGirls(localDate.Day, localDate.Month);
 
