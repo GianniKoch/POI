@@ -12,6 +12,7 @@ services:
             - Discord:Prefix=$DiscordPrefix
             - Discord:Token=$DiscordToken
             - Paths:DataFolderPath=/var/lib/poi/data
+            - TZ=$TZ
     postgres:
         image: postgres:16-alpine
         ports:
