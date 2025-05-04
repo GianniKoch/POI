@@ -1,6 +1,7 @@
 using DSharpPlus.CommandsNext;
 using DSharpPlus.Entities;
 using ImageMagick;
+using ImageMagick.Drawing;
 using Microsoft.Extensions.Logging;
 using NodaTime;
 using POI.DiscordDotNet.Commands.ChatCommands.Modules;

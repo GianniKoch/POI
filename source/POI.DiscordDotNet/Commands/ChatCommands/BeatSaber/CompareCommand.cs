@@ -2,6 +2,7 @@ using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
 using ImageMagick;
+using ImageMagick.Drawing;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using NodaTime;
@@ -117,7 +118,7 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 				{
 					erisSignature.Resize(100, 46);
 					erisSignature.Blur(0, 0.5);
-					background.Composite(erisSignature, WIDTH - MARGIN - erisSignature.Width, HEIGHT - MARGIN - erisSignature.Height, CompositeOperator.Over);
+					background.Composite(erisSignature, WIDTH - MARGIN - (int) erisSignature.Width, HEIGHT - MARGIN - (int) erisSignature.Height, CompositeOperator.Over);
 				}
 
 				// PlayerNames
@@ -139,7 +140,7 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 				playerNameSettings.TextGravity = Gravity.East;
 				using (var playerNameCaption = new MagickImage($"label:{profile2.Name}", playerNameSettings))
 				{
-					background.Composite(playerNameCaption, WIDTH - MARGIN - playerNameCaption.Width, NAME_HEIGHT, CompositeOperator.Over);
+					background.Composite(playerNameCaption, WIDTH - MARGIN - (int) playerNameCaption.Width, NAME_HEIGHT, CompositeOperator.Over);
 				}
 
 				// player1 image
@@ -208,14 +209,14 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 					playerRankSettings.TextGravity = Gravity.Center;
 					using (var playerRankCaption = new MagickImage($"label:{arg[1]}", playerRankSettings))
 					{
-						background.Composite(playerRankCaption, WIDTH / 2 - playerRankCaption.Width / 2, RANK_HEIGHT + index * 50, CompositeOperator.Over);
+						background.Composite(playerRankCaption,(int) (WIDTH / 2 - playerRankCaption.Width / 2), RANK_HEIGHT + index * 50, CompositeOperator.Over);
 					}
 
 					playerRankSettings.FillColor = val1 < val2 ? MagickColors.LimeGreen : Math.Abs(val1 - val2) < 0.0001 ? MagickColors.White : MagickColors.IndianRed;
 					playerRankSettings.TextGravity = Gravity.East;
 					using (var playerRankCaption = new MagickImage($"label:{arg[2]}", playerRankSettings))
 					{
-						background.Composite(playerRankCaption, WIDTH - MARGIN - playerRankCaption.Width, RANK_HEIGHT + index * 50, CompositeOperator.Over);
+						background.Composite(playerRankCaption, WIDTH - MARGIN - (int) playerRankCaption.Width, RANK_HEIGHT + index * 50, CompositeOperator.Over);
 					}
 				}
 
