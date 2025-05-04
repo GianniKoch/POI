@@ -3,6 +3,7 @@ version: '3.9'
 services:
     poi:
         image: ghcr.io/giannikoch/poi:main
+    	restart: unless-stopped
         depends_on:
             - postgres
         volumes:
@@ -15,6 +16,7 @@ services:
             - TZ=$TZ
     postgres:
         image: postgres:16-alpine
+    	restart: unless-stopped
         ports:
             - 5001:5432
         volumes:
