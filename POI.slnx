@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="source/POI.DiscordDotNet/POI.DiscordDotNet.csproj" />
+  <Project Path="source/POI.Persistence.Domain/POI.Persistence.Domain.csproj" />
+  <Project Path="source/POI.Persistence.EFCore.Npgsql/POI.Persistence.EFCore.Npgsql.csproj" />
+  <Project Path="source/POI.Persistence/POI.Persistence.csproj" />
+  <Project Path="source/POI.ThirdParty.BeatSaver/POI.ThirdParty.BeatSaver.csproj" />
+  <Project Path="source/POI.ThirdParty.BeatSavior/POI.ThirdParty.BeatSavior.csproj" />
+  <Project Path="source/POI.ThirdParty.Core/POI.ThirdParty.Core.csproj" />
+  <Project Path="source/POI.ThirdParty.ScoreSaber/POI.ThirdParty.ScoreSaber.csproj" />
+</Solution>
