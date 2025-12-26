@@ -1,27 +1,60 @@
-version: '3.9'
-
 services:
-    poi:
-        image: ghcr.io/giannikoch/poi:main
-        restart: unless-stopped
-        depends_on:
-            - postgres
-        volumes:
-            - $POI_DATA:/var/lib/poi/data
-        environment:
-            - ConnectionStrings:PostgreSQL=$ConnectionStringsPostgreSQL
-            - Discord:Prefix=$DiscordPrefix
-            - Discord:Token=$DiscordToken
-            - Paths:DataFolderPath=/var/lib/poi/data
-            - TZ=$TZ
-    postgres:
-        image: postgres:16-alpine
-        restart: unless-stopped
-        ports:
-            - 5001:5432
-        volumes:
-            - $POSTGRES_DATA:/var/lib/postgresql/data
-        environment:
-            - POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-            - POSTGRES_USER=$POSTGRES_USER
-            - POSTGRES_DB=$POSTGRES_DB
+  nordvpn:
+    image: bubuntux/nordvpn:latest
+    container_name: nordvpn-poi
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - USER=${NORDVPN_TOKEN}
+      - CONNECT=Belgium
+      - TZ=${TZ}
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    restart: unless-stopped
+    networks:
+      - vpn_network
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5001:5432"
+    volumes:
+      - ${POSTGRES_DATA}:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_DB=${POSTGRES_DB}
+    networks:
+      - db_network
+
+  poi:
+    image: ghcr.io/giannikoch/poi:main
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - nordvpn
+    volumes:
+      - ${POI_DATA}:/var/lib/poi/data
+    environment:
+      - ConnectionStrings:PostgreSQL=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - Discord:Prefix=${DiscordPrefix}
+      - Discord:Token=${DiscordToken}
+      - Paths:DataFolderPath=/var/lib/poi/data
+      - TZ=${TZ}
+    networks:
+      vpn_network:
+        aliases:
+          - vpn-poi
+      db_network:
+        aliases:
+          - poi-db
+
+networks:
+  vpn_network:
+    driver: bridge
+    internal: true
+  db_network:
+    driver: bridge
