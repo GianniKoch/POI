@@ -14,6 +14,7 @@ COPY ["source/POI.ThirdParty.BeatSaver/POI.ThirdParty.BeatSaver.csproj", "source
 COPY ["source/POI.ThirdParty.Core/POI.ThirdParty.Core.csproj", "source/POI.ThirdParty.Core/"]
 COPY ["source/POI.ThirdParty.BeatSavior/POI.ThirdParty.BeatSavior.csproj", "source/POI.ThirdParty.BeatSavior/"]
 COPY ["source/POI.ThirdParty.ScoreSaber/POI.ThirdParty.ScoreSaber.csproj", "source/POI.ThirdParty.ScoreSaber/"]
+COPY ["source/POI.ThirdParty.ScoreSaber.HttpClient/POI.ThirdParty.ScoreSaber.HttpClient.csproj", "source/POI.ThirdParty.ScoreSaber.HttpClient/"]
 RUN dotnet restore "source/POI.DiscordDotNet/POI.DiscordDotNet.csproj"
 COPY . .
 WORKDIR "/src/source/POI.DiscordDotNet"

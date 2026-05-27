@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NSwag.MSBuild" Version="14.2.0">
+    <PackageReference Include="NSwag.MSBuild" Version="14.3.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -16,6 +16,6 @@
   </ItemGroup>
 
   <Target Name="NSwag" BeforeTargets="PrepareForBuild">
-    <Exec Command="$(NSwagExe_Net90) run nswag.json" />
+    <Exec Command="$(NSwagExe_Net90) run nswag.json" EnvironmentVariables="DOTNET_ROLL_FORWARD=Major" />
   </Target>
 </Project>
