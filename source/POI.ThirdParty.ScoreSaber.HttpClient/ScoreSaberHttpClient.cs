@@ -1,6 +1,8 @@
 ﻿using System.Net;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Polly;
 using Polly.Retry;
 
@@ -22,6 +24,11 @@ public partial class ScoreSaberHttpClient
 			.Handle<HttpRequestException>((exception => exception.StatusCode != HttpStatusCode.NotFound))
 			.Or<TaskCanceledException>()
 			.WaitAndRetryAsync(3, _ => TimeSpan.FromSeconds(10));
+	}
+
+	static partial void UpdateJsonSerializerSettings(JsonSerializerSettings settings)
+	{
+		settings.Converters.Add(new IdConverter());
 	}
 
 	public async Task<byte[]?> FetchImageFromCdn(string url, CancellationToken cancellationToken = default)
@@ -48,6 +55,73 @@ public partial class ScoreSaberHttpClient
 		{
 			_logger.LogError("{Exception}", e.ToString());
 			return null;
+		}
+	}
+
+	private class IdConverter : JsonConverter
+	{
+		public override bool CanConvert(Type objectType)
+		{
+			if (objectType.Namespace != "POI.ThirdParty.ScoreSaber.HttpClient")
+			{
+				return false;
+			}
+
+			var name = objectType.Name;
+			return Regex.IsMatch(name, @"^Id\d+$") ||
+			       name.Equals("LeftAverageCut", StringComparison.OrdinalIgnoreCase) ||
+			       name.Equals("RightAverageCut", StringComparison.OrdinalIgnoreCase);
+		}
+
+		public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
+		{
+			if (reader.TokenType == JsonToken.Null)
+			{
+				return null;
+			}
+
+			var instance = Activator.CreateInstance(objectType);
+			if (reader.TokenType is JsonToken.Integer or JsonToken.String or JsonToken.Float)
+			{
+				var value = reader.Value;
+				var additionalPropertiesProperty = objectType.GetProperty("AdditionalProperties");
+				if (additionalPropertiesProperty != null)
+				{
+					var additionalProperties = (IDictionary<string, object>) additionalPropertiesProperty.GetValue(instance)!;
+					additionalProperties["Value"] = value!;
+				}
+
+				return instance;
+			}
+
+			if (reader.TokenType == JsonToken.StartObject)
+			{
+				serializer.Populate(reader, instance!);
+			}
+
+			return instance;
+		}
+
+		public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
+		{
+			if (value == null)
+			{
+				writer.WriteNull();
+				return;
+			}
+
+			var additionalPropertiesProperty = value.GetType().GetProperty("AdditionalProperties");
+			if (additionalPropertiesProperty != null)
+			{
+				var additionalProperties = (IDictionary<string, object>) additionalPropertiesProperty.GetValue(value)!;
+				if (additionalProperties.Count == 1 && additionalProperties.ContainsKey("Value"))
+				{
+					writer.WriteValue(additionalProperties["Value"]);
+					return;
+				}
+			}
+
+			serializer.Serialize(writer, value);
 		}
 	}
 }
