@@ -270,3 +270,5 @@ data/*
 
 # Visual Studio Code
 **/launchSettings.json*
+
+.localdev/

@@ -1,7 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-
-using System.Globalization;
-using System.Runtime.InteropServices;
+﻿using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -15,9 +12,9 @@ using POI.Persistence.EFCore.Npgsql.Extensions;
 using POI.DiscordDotNet.Services;
 using POI.DiscordDotNet.Services.Implementations;
 using POI.ThirdParty.BeatSaver.Extensions;
-using POI.ThirdParty.BeatSavior.Extensions;
 using POI.ThirdParty.Core.Services;
 using POI.ThirdParty.ScoreSaber.Extensions;
+using POI.ThirdParty.ScoreSaber.HttpClient;
 using Quartz;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -60,8 +57,9 @@ var host = Host.CreateDefaultBuilder()
 		services
 			.AddSingleton<IConstants, Constants>()
 			.AddBeatSaver()
-			.AddBeatSavior()
-			.AddScoreSaber();
+			// .AddBeatSavior()
+			.AddScoreSaber()
+			.AddScoreSaberV2();
 
 		// Add persistence layer
 		var connectionString = context.Configuration.GetConnectionString("PostgreSQL")!;

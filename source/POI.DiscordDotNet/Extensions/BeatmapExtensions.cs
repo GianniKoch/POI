@@ -1,6 +1,7 @@
 ﻿using ImageMagick;
 using POI.DiscordDotNet.Services.Implementations;
-using POI.ThirdParty.Core.Models.Shared;
+using POI.ThirdParty.ScoreSaber.HttpClient;
+using Difficulty = POI.ThirdParty.Core.Models.Shared.Difficulty;
 
 namespace POI.DiscordDotNet.Extensions
 {
@@ -19,15 +20,15 @@ namespace POI.DiscordDotNet.Extensions
 			};
 		}
 
-		internal static MagickColor ReturnDifficultyColor(this Difficulty difficultyNumber)
+		internal static MagickColor ReturnDifficultyColor(this Difficulty5 difficultyNumber)
 		{
-			return difficultyNumber switch
+			return (int) difficultyNumber.Difficulty switch
 			{
-				Difficulty.Easy => Constants.DifficultyColors.Easy,
-				Difficulty.Normal => Constants.DifficultyColors.Normal,
-				Difficulty.Hard => Constants.DifficultyColors.Hard,
-				Difficulty.Expert => Constants.DifficultyColors.Expert,
-				Difficulty.ExpertPlus => Constants.DifficultyColors.ExpertPlus,
+				(int) Difficulty.Easy => Constants.DifficultyColors.Easy,
+				(int) Difficulty.Normal => Constants.DifficultyColors.Normal,
+				(int) Difficulty.Hard => Constants.DifficultyColors.Hard,
+				(int) Difficulty.Expert => Constants.DifficultyColors.Expert,
+				(int) Difficulty.ExpertPlus => Constants.DifficultyColors.ExpertPlus,
 				_ => MagickColors.Gray
 			};
 		}

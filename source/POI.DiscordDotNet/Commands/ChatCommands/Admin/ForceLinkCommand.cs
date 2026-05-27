@@ -15,9 +15,9 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.Admin
 	[RequiresUserSettingsPermission(Permissions.ForceLink)]
 	public class ForceLinkCommand : BaseLinkCommand
 	{
-		public ForceLinkCommand(ILogger<ForceLinkCommand> logger, IScoreSaberApiService scoreSaberApiService, IGlobalUserSettingsRepository globalUserSettingsRepository,
+		public ForceLinkCommand(ILogger<ForceLinkCommand> logger, IScoreSaberApiV1Service scoreSaberApiV1Service, IGlobalUserSettingsRepository globalUserSettingsRepository,
 			IServerDependentUserSettingsRepository serverDependentUserSettingsRepository)
-			: base(logger, scoreSaberApiService, globalUserSettingsRepository, serverDependentUserSettingsRepository)
+			: base(logger, scoreSaberApiV1Service, globalUserSettingsRepository, serverDependentUserSettingsRepository)
 		{
 		}
 

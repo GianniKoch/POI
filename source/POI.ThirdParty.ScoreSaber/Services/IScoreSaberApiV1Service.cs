@@ -4,7 +4,7 @@ using POI.ThirdParty.ScoreSaber.Models.Wrappers;
 
 namespace POI.ThirdParty.ScoreSaber.Services;
 
-public interface IScoreSaberApiService
+public interface IScoreSaberApiV1Service
 {
 	Task<BasicProfileDto?> FetchBasicPlayerProfile(string scoreSaberId, CancellationToken cancellationToken = default);
 	Task<FullProfileDto?> FetchFullPlayerProfile(string scoreSaberId, CancellationToken cancellationToken = default);

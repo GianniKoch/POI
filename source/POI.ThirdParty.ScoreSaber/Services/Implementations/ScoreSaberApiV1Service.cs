@@ -20,13 +20,13 @@ using Polly.Wrap;
 
 namespace POI.ThirdParty.ScoreSaber.Services.Implementations;
 
-internal class ScoreSaberApiService : IScoreSaberApiService
+internal class ScoreSaberApiV1Service : IScoreSaberApiV1Service
 {
 	private const string SCORESABER_BASEURL = "https://scoresaber.com";
 	private const string SCORESABER_API_BASEURL = SCORESABER_BASEURL + "/api/";
 	private const int MAX_BULKHEAD_QUEUE_SIZE = 1000;
 
-	private readonly ILogger<ScoreSaberApiService> _logger;
+	private readonly ILogger<ScoreSaberApiV1Service> _logger;
 	private readonly HttpClient _scoreSaberApiClient;
 
 	private readonly AsyncPolicyWrap<HttpResponseMessage> _scoreSaberApiChainedRateLimitPolicy;
@@ -38,7 +38,7 @@ internal class ScoreSaberApiService : IScoreSaberApiService
 	private readonly JsonSerializerOptions _jsonSerializerOptions;
 	private readonly ScoreSaberSerializerContext _scoreSaberSerializerContext;
 
-	public ScoreSaberApiService(ILogger<ScoreSaberApiService> logger, IConstants constants)
+	public ScoreSaberApiV1Service(ILogger<ScoreSaberApiV1Service> logger, IConstants constants)
 	{
 		_logger = logger;
 		_scoreSaberApiClient = new HttpClient

@@ -10,9 +10,9 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 	[UsedImplicitly]
 	public class ScoreLinkCommand : BaseLinkCommand
 	{
-		public ScoreLinkCommand(ILogger<ScoreLinkCommand> logger, IScoreSaberApiService scoreSaberApiService, IGlobalUserSettingsRepository globalUserSettingsRepository,
+		public ScoreLinkCommand(ILogger<ScoreLinkCommand> logger, IScoreSaberApiV1Service scoreSaberApiV1Service, IGlobalUserSettingsRepository globalUserSettingsRepository,
 			IServerDependentUserSettingsRepository serverDependentUserSettingsRepository)
-			: base(logger, scoreSaberApiService, globalUserSettingsRepository, serverDependentUserSettingsRepository)
+			: base(logger, scoreSaberApiV1Service, globalUserSettingsRepository, serverDependentUserSettingsRepository)
 		{
 		}
 

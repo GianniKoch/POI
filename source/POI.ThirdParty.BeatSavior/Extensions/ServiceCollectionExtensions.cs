@@ -15,6 +15,7 @@ public static class ServiceCollectionExtensions
 	///		Make sure that the <see cref="POI.ThirdParty.Core.Services.IConstants">IConstants</see> and <see cref="Microsoft.Extensions.Logging.ILogger">ILogger</see> interfaces have been
 	///		registered before calling this method
 	///  </remark>
+	[Obsolete("This project is no longer maintained.")]
 	public static IServiceCollection AddBeatSavior(this IServiceCollection serviceCollection)
 	{
 		serviceCollection.TryAddSingleton<IBeatSaviorApiService, BeatSaviorApiService>();

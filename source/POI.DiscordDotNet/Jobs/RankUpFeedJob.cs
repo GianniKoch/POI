@@ -6,8 +6,7 @@ using POI.Persistence.Domain;
 using POI.Persistence.Models.AccountLink;
 using POI.Persistence.Repositories;
 using POI.DiscordDotNet.Services;
-using POI.ThirdParty.ScoreSaber.Models.Profile;
-using POI.ThirdParty.ScoreSaber.Services;
+using POI.ThirdParty.ScoreSaber.HttpClient;
 using Quartz;
 
 namespace POI.DiscordDotNet.Jobs
@@ -16,18 +15,17 @@ namespace POI.DiscordDotNet.Jobs
 	public class RankUpFeedJob : IJob
 	{
 		private const int TOP = 1000;
+		private const int PAGE_SIZE = 100;
 
 		private readonly ILogger<RankUpFeedJob> _logger;
 		private readonly IDiscordClientProvider _discordClientProvider;
-		private readonly IScoreSaberApiService _scoreSaberApiService;
+		private readonly ScoreSaberHttpClient _scoreSaberApiService;
 		private readonly IGlobalUserSettingsRepository _globalUserSettingsRepository;
 		private readonly ILeaderboardEntriesRepository _leaderboardEntriesRepository;
 
-		private readonly string[] _countryDefinition = { "BE" };
-		private readonly string[] _profileRefreshExclusions = Array.Empty<string>();
 		private readonly IServerSettingsRepository _serverSettingsRepository;
 
-		public RankUpFeedJob(ILogger<RankUpFeedJob> logger, IDiscordClientProvider discordClientProviderProvider, IScoreSaberApiService scoreSaberApiService,
+		public RankUpFeedJob(ILogger<RankUpFeedJob> logger, IDiscordClientProvider discordClientProviderProvider, ScoreSaberHttpClient scoreSaberApiService,
 			IGlobalUserSettingsRepository globalUserSettingsRepository, ILeaderboardEntriesRepository leaderboardEntriesRepository, IServerSettingsRepository serverSettingsRepository)
 		{
 			_logger = logger;
@@ -47,17 +45,28 @@ namespace POI.DiscordDotNet.Jobs
 				return;
 			}
 
-			var playersWrappers = await Task.WhenAll(Enumerable
-				.Range(1, TOP / 50)
-				.Select(page => _scoreSaberApiService.FetchPlayers((uint) page, countries: _countryDefinition)));
-			if (playersWrappers.Any(x => x == null))
+			var firstPlayersWrapper = await _scoreSaberApiService.GetBelgianPlayers(1, context.CancellationToken);
+			if (firstPlayersWrapper == null)
 			{
 				return;
 			}
 
-			var players = playersWrappers
-				.SelectMany(wrapper => wrapper!.Players)
-				.Where(player => player.Pp > 0 && player.Rank > 0)
+			var pageCount = (int) firstPlayersWrapper.Metadata.TotalItems > TOP ? TOP : (int) firstPlayersWrapper.Metadata.TotalItems / PAGE_SIZE;
+			var playersWrappersList = new List<Response2> { firstPlayersWrapper };
+			for (var page = 2; page <= pageCount; page++)
+			{
+				var wrapper = await _scoreSaberApiService.GetBelgianPlayers(page, context.CancellationToken);
+				if (wrapper == null)
+				{
+					return;
+				}
+
+				playersWrappersList.Add(wrapper);
+			}
+
+			var players = playersWrappersList
+				.SelectMany(wrapper => wrapper.Data)
+				.Where(player => player.Stats.TotalPP > 0 && player.Stats.Rank > 0)
 				.ToList();
 
 			var allScoreSaberLinks = await _globalUserSettingsRepository.GetAllScoreSaberAccountLinks().ConfigureAwait(false);
@@ -68,10 +77,10 @@ namespace POI.DiscordDotNet.Jobs
 			}
 
 			await _leaderboardEntriesRepository.DeleteAll().ConfigureAwait(false);
-			await _leaderboardEntriesRepository.Insert(players.Select(p => new LeaderboardEntry(p.Id, p.Name, p.CountryRank, p.Pp))).ConfigureAwait(false);
+			await _leaderboardEntriesRepository.Insert(players.Select(p => new LeaderboardEntry(p.Id, p.Name, (uint)p.Stats.CountryRank, p.Stats.TotalPP))).ConfigureAwait(false);
 		}
 
-		private async Task HandleGuild(ServerSettings serverSetting, List<ExtendedBasicProfileDto> players, List<ScoreSaberAccountLink> allScoreSaberLinks)
+		private async Task HandleGuild(ServerSettings serverSetting, List<Data> players, List<ScoreSaberAccountLink> allScoreSaberLinks)
 		{
 			DiscordGuild guild;
 			try
@@ -85,7 +94,7 @@ namespace POI.DiscordDotNet.Jobs
 			}
 
 			var members = await guild.GetAllMembersAsync();
-			if (members == null)
+			if (members is null)
 			{
 				return;
 			}
@@ -102,13 +111,13 @@ namespace POI.DiscordDotNet.Jobs
 			await PostChangesOnDiscord(guild, originalLeaderboardEntries, players, serverSetting.RankUpFeedChannelId!.Value);
 		}
 
-		private async Task HandlePlayer(ProfileBaseDto player,
+		private async Task HandlePlayer(Data player,
 			IEnumerable<ScoreSaberAccountLink> scoreSaberLinks,
 			IEnumerable<DiscordMember> members,
 			IReadOnlyCollection<(uint? RankThreshold, DiscordRole Role)> roles)
 		{
 			// _logger.LogDebug("#{Rank} {Name}", player.CountryRank, player.Name);
-			await TriggerProfileRefreshIfNeeded(player);
+			// await TriggerProfileRefreshIfNeeded(player);
 
 			var discordId = scoreSaberLinks.FirstOrDefault(x => x.ScoreSaberId == player.Id)?.DiscordId;
 			if (discordId == null)
@@ -118,7 +127,7 @@ namespace POI.DiscordDotNet.Jobs
 			}
 
 			var member = members.FirstOrDefault(x => x.Id == discordId);
-			if (member == null)
+			if (member is null)
 			{
 				// _logger.LogWarning("ScoreLink exists for non-Discord-member. ScoreSaber name: {PlayerName}, ScoreSaberId: {PlayerId}", player.Name, player.Id);
 				return;
@@ -127,7 +136,7 @@ namespace POI.DiscordDotNet.Jobs
 			var currentTopRoles = member.Roles.Where(x => x.Name.Contains("(Top ", StringComparison.Ordinal)).ToList();
 			// _logger.LogDebug("Currently has role {RoleName}", string.Join(", ", currentTopRoles.Select(x => x.Name)));
 
-			var applicableRole = DetermineApplicableRole(roles, player.Rank);
+			var applicableRole = DetermineApplicableRole(roles, (uint) player.Stats.Rank);
 
 			// Check whether the applicable role is granted
 			if (currentTopRoles.All(role => role.Id != applicableRole.Id))
@@ -144,21 +153,21 @@ namespace POI.DiscordDotNet.Jobs
 			}
 		}
 
-		private async Task TriggerProfileRefreshIfNeeded(ProfileBaseDto player)
-		{
-			if (player.ProfilePicture.EndsWith("steam.png") && player.Id.Length == 17 && player.Id.StartsWith("7"))
-			{
-				if (_profileRefreshExclusions.Contains(player.Id))
-				{
-					_logger.LogWarning("Refresh prevented for player {PlayerName} at rank {PlayerRank} due to explicit exclusion", player.Name, player.CountryRank);
-				}
-				else
-				{
-					_logger.LogInformation("Calling Refresh for player {PlayerName} at rank {PlayerRank}", player.Name, player.CountryRank);
-					await _scoreSaberApiService.RefreshProfile(player.Id).ConfigureAwait(false);
-				}
-			}
-		}
+		// private async Task TriggerProfileRefreshIfNeeded(Data player)
+		// {
+		// 	if (player.Avatar.EndsWith("steam.png") && player.Id.Length == 17 && player.Id.StartsWith("7"))
+		// 	{
+		// 		if (_profileRefreshExclusions.Contains(player.Id))
+		// 		{
+		// 			_logger.LogWarning("Refresh prevented for player {PlayerName} at rank {PlayerRank} due to explicit exclusion", player.Name, player.CountryRank);
+		// 		}
+		// 		else
+		// 		{
+		// 			_logger.LogInformation("Calling Refresh for player {PlayerName} at rank {PlayerRank}", player.Name, player.CountryRank);
+		// 			await _scoreSaberApiService.RefreshProfile(player.Id).ConfigureAwait(false);
+		// 		}
+		// 	}
+		// }
 
 		private static List<(uint? RankThreshold, DiscordRole Role)> OrderTopRoles(IEnumerable<KeyValuePair<ulong, DiscordRole>> unorderedTopRoles)
 		{
@@ -193,7 +202,7 @@ namespace POI.DiscordDotNet.Jobs
 			return applicableRole;
 		}
 
-		private static async Task PostChangesOnDiscord(DiscordGuild guild, IReadOnlyCollection<LeaderboardEntry> originalLeaderboardEntries, List<ExtendedBasicProfileDto> players,
+		private static async Task PostChangesOnDiscord(DiscordGuild guild, IReadOnlyCollection<LeaderboardEntry> originalLeaderboardEntries, List<Data> players,
 			ulong rankUpFeedChannelId)
 		{
 			var rankedUpPlayers = DetermineRankedUpPlayers(originalLeaderboardEntries, players);
@@ -207,8 +216,8 @@ namespace POI.DiscordDotNet.Jobs
 						.WithPoiColor()
 						.WithTitle($"Well done, {player.Name}")
 						.WithUrl($"https://scoresaber.com/u/{player.Id}")
-						.WithThumbnail(player.ProfilePicture)
-						.WithDescription($"{player.Name} is now rank **#{player.CountryRank}** of the BE beat saber players with a total pp of **{player.Pp}**")
+						.WithThumbnail(player.Avatar)
+						.WithDescription($"{player.Name} is now rank **#{(uint)player.Stats.CountryRank}** of the BE beat saber players with a total pp of **{player.Stats.TotalPP}**")
 						.Build();
 
 					await rankUpFeedChannel.SendMessageAsync(rankUpEmbed).ConfigureAwait(false);
@@ -216,13 +225,13 @@ namespace POI.DiscordDotNet.Jobs
 			}
 		}
 
-		private static List<ExtendedBasicProfileDto> DetermineRankedUpPlayers(IReadOnlyCollection<LeaderboardEntry> originalLeaderboard, List<ExtendedBasicProfileDto> currentLeaderboard)
+		private static List<Data> DetermineRankedUpPlayers(IReadOnlyCollection<LeaderboardEntry> originalLeaderboard, List<Data> currentLeaderboard)
 		{
-			var playersWithRankUp = new List<ExtendedBasicProfileDto>();
+			var playersWithRankUp = new List<Data>();
 			foreach (var player in currentLeaderboard)
 			{
 				var oldEntry = originalLeaderboard.FirstOrDefault(x => x.ScoreSaberId == player.Id);
-				if (oldEntry == null || (player.CountryRank < oldEntry.CountryRank && Math.Abs(player.Pp - oldEntry.Pp) > 0.01))
+				if (oldEntry == null || (player.Stats.CountryRank < oldEntry.CountryRank && Math.Abs(player.Stats.TotalPP - oldEntry.Pp) > 0.01))
 				{
 					playersWithRankUp.Add(player);
 				}

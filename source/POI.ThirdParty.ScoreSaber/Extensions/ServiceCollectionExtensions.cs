@@ -17,7 +17,7 @@ public static class ServiceCollectionExtensions
 	///  </remark>
 	public static IServiceCollection AddScoreSaber(this IServiceCollection serviceCollection)
 	{
-		serviceCollection.TryAddSingleton<IScoreSaberApiService, ScoreSaberApiService>();
+		serviceCollection.TryAddSingleton<IScoreSaberApiV1Service, ScoreSaberApiV1Service>();
 
 		return serviceCollection;
 	}

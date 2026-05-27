@@ -7,4 +7,5 @@
   <Project Path="source/POI.ThirdParty.BeatSavior/POI.ThirdParty.BeatSavior.csproj" />
   <Project Path="source/POI.ThirdParty.Core/POI.ThirdParty.Core.csproj" />
   <Project Path="source/POI.ThirdParty.ScoreSaber/POI.ThirdParty.ScoreSaber.csproj" />
+  <Project Path="source/POI.ThirdParty.ScoreSaber.HttpClient/POI.ThirdParty.ScoreSaber.HttpClient.csproj" />
 </Solution>

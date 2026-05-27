@@ -28,13 +28,13 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 		private readonly ILogger<CompareCommand> _logger;
 		private readonly IGlobalUserSettingsRepository _globalUserSettingsRepository;
 		private readonly PathProvider _pathProvider;
-		private readonly IScoreSaberApiService _scoreSaberService;
+		private readonly IScoreSaberApiV1Service _scoreSaberV1Service;
 
-		public CompareCommand(ILogger<CompareCommand> logger, IScoreSaberApiService scoreSaberService, IGlobalUserSettingsRepository globalUserSettingsRepository, PathProvider pathProvider)
+		public CompareCommand(ILogger<CompareCommand> logger, IScoreSaberApiV1Service scoreSaberV1Service, IGlobalUserSettingsRepository globalUserSettingsRepository, PathProvider pathProvider)
 		{
 			_logger = logger;
 
-			_scoreSaberService = scoreSaberService;
+			_scoreSaberV1Service = scoreSaberV1Service;
 			_globalUserSettingsRepository = globalUserSettingsRepository;
 			_pathProvider = pathProvider;
 		}
@@ -63,36 +63,36 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 
 			var (scoreSaberId, compareScoreSaberId) = arguments.Value;
 
-			var profile1 = await _scoreSaberService.FetchFullPlayerProfile(scoreSaberId).ConfigureAwait(false);
+			var profile1 = await _scoreSaberV1Service.FetchFullPlayerProfile(scoreSaberId).ConfigureAwait(false);
 			if (profile1 == null)
 			{
 				await _logger.LogError(ctx, $"Couldn't fetch profile {scoreSaberId}").ConfigureAwait(false);
 				return;
 			}
 
-			var profile2 = await _scoreSaberService.FetchFullPlayerProfile(compareScoreSaberId).ConfigureAwait(false);
+			var profile2 = await _scoreSaberV1Service.FetchFullPlayerProfile(compareScoreSaberId).ConfigureAwait(false);
 			if (profile2 == null)
 			{
 				await _logger.LogError(ctx, $"Couldn't fetch profile {compareScoreSaberId}").ConfigureAwait(false);
 				return;
 			}
 
-			var profile1TopPage = await _scoreSaberService.FetchTopSongsScorePage(scoreSaberId, 0).ConfigureAwait(false);
+			var profile1TopPage = await _scoreSaberV1Service.FetchTopSongsScorePage(scoreSaberId, 0).ConfigureAwait(false);
 			if (profile1TopPage == null)
 			{
 				await _logger.LogError(ctx, $"Couldn't fetch profile top scores {scoreSaberId}").ConfigureAwait(false);
 				return;
 			}
 
-			var profile2TopPage = await _scoreSaberService.FetchTopSongsScorePage(compareScoreSaberId, 0).ConfigureAwait(false);
+			var profile2TopPage = await _scoreSaberV1Service.FetchTopSongsScorePage(compareScoreSaberId, 0).ConfigureAwait(false);
 			if (profile2TopPage == null)
 			{
 				await _logger.LogError(ctx, $"Couldn't fetch profile top scores {compareScoreSaberId}").ConfigureAwait(false);
 				return;
 			}
 
-			var profile1ImageBytes = await _scoreSaberService.FetchImageFromCdn(profile1.ProfilePicture).ConfigureAwait(false);
-			var profile2ImageBytes = await _scoreSaberService.FetchImageFromCdn(profile2.ProfilePicture).ConfigureAwait(false);
+			var profile1ImageBytes = await _scoreSaberV1Service.FetchImageFromCdn(profile1.ProfilePicture).ConfigureAwait(false);
+			var profile2ImageBytes = await _scoreSaberV1Service.FetchImageFromCdn(profile2.ProfilePicture).ConfigureAwait(false);
 
 			var backgroundImagePath = Path.Combine(_pathProvider.AssetsPath, "poinextCompareBG.png");
 			var erisSignaturePath = Path.Combine(_pathProvider.AssetsPath, "Signature-Eris.png");

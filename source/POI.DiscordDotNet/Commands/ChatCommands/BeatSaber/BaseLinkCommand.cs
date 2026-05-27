@@ -20,16 +20,16 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 		private const string DENY_ACTION_ID = "deny";
 
 		private readonly ILogger<BaseLinkCommand> _logger;
-		private readonly IScoreSaberApiService _scoreSaberApiService;
+		private readonly IScoreSaberApiV1Service _scoreSaberApiV1Service;
 		private readonly IServerDependentUserSettingsRepository _serverDependentUserSettingsRepository;
 
 		protected readonly IGlobalUserSettingsRepository GlobalUserSettingsRepository;
 
-		protected BaseLinkCommand(ILogger<BaseLinkCommand> logger, IScoreSaberApiService scoreSaberApiService, IGlobalUserSettingsRepository globalUserSettingsRepository,
+		protected BaseLinkCommand(ILogger<BaseLinkCommand> logger, IScoreSaberApiV1Service scoreSaberApiV1Service, IGlobalUserSettingsRepository globalUserSettingsRepository,
 			IServerDependentUserSettingsRepository serverDependentUserSettingsRepository)
 		{
 			_logger = logger;
-			_scoreSaberApiService = scoreSaberApiService;
+			_scoreSaberApiV1Service = scoreSaberApiV1Service;
 
 			GlobalUserSettingsRepository = globalUserSettingsRepository;
 			_serverDependentUserSettingsRepository = serverDependentUserSettingsRepository;
@@ -42,7 +42,7 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 
 		protected async Task<BasicProfileDto?> FetchScoreSaberProfile(CommandContext ctx, string scoreSaberId)
 		{
-			var playerInfo = await _scoreSaberApiService.FetchBasicPlayerProfile(scoreSaberId);
+			var playerInfo = await _scoreSaberApiV1Service.FetchBasicPlayerProfile(scoreSaberId);
 			if (playerInfo == null)
 			{
 				await ctx.Message.RespondAsync("I didn't find the scoresaber account. Maybe you made a typo!?!");

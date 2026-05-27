@@ -10,13 +10,10 @@ using POI.Persistence.Repositories;
 using POI.ThirdParty.BeatSaver.Extensions;
 using POI.ThirdParty.BeatSaver.Services;
 using POI.ThirdParty.BeatSavior.Models;
-using POI.ThirdParty.BeatSavior.Services;
 using POI.ThirdParty.ScoreSaber;
 using POI.ThirdParty.ScoreSaber.Extensions;
+using POI.ThirdParty.ScoreSaber.HttpClient;
 using POI.ThirdParty.ScoreSaber.Models.Profile;
-using POI.ThirdParty.ScoreSaber.Models.Scores;
-using POI.ThirdParty.ScoreSaber.Models.Wrappers;
-using POI.ThirdParty.ScoreSaber.Services;
 
 namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 {
@@ -28,27 +25,24 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 		private readonly IGlobalUserSettingsRepository _globalUserSettingsRepository;
 		private readonly IBeatSaverClientProvider _beatSaverClientProvider;
 
-		protected readonly IScoreSaberApiService ScoreSaberApiService;
-		protected readonly IBeatSaviorApiService BeatSaviorApiService;
+		protected readonly ScoreSaberHttpClient ScoreSaberApiService;
 
 		private const int WIDTH = 1024;
 		private const int MARGIN = 35;
 
-		protected BaseSongCommand(ILogger<BaseSongCommand> logger, IScoreSaberApiService scoreSaberApiService, IGlobalUserSettingsRepository globalUserSettingsRepository,
-			IBeatSaverClientProvider beatSaverClientProvider, string backgroundImagePath, string erisSignaturePath, IBeatSaviorApiService beatSaviorApiService)
+		protected BaseSongCommand(ILogger<BaseSongCommand> logger, ScoreSaberHttpClient scoreSaberApiService, IGlobalUserSettingsRepository globalUserSettingsRepository,
+			IBeatSaverClientProvider beatSaverClientProvider, string backgroundImagePath, string erisSignaturePath)
 		{
 			_logger = logger;
 
 			ScoreSaberApiService = scoreSaberApiService;
-			BeatSaviorApiService = beatSaviorApiService;
-
 			_globalUserSettingsRepository = globalUserSettingsRepository;
 			_beatSaverClientProvider = beatSaverClientProvider;
 			_backgroundImagePath = backgroundImagePath;
 			_erisSignaturePath = erisSignaturePath;
 		}
 
-		protected abstract Task<PlayerScoresWrapperDto?> FetchScorePage(string playerId, uint page);
+		protected abstract Task<Response6?> FetchScorePage(string playerId, int page);
 
 		// ReSharper disable once CognitiveComplexity
 		protected async Task GenerateScoreImageAndSendInternal(CommandContext ctx)
@@ -64,14 +58,14 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 
 			var (scoreSaberId, nthSong) = arguments.Value;
 
-			var profile = await ScoreSaberApiService.FetchBasicPlayerProfile(scoreSaberId).ConfigureAwait(false);
+			var profile = await ScoreSaberApiService.PlayerController_getPlayerBasic_v2Async(scoreSaberId, null).ConfigureAwait(false);
 			if (profile == null)
 			{
 				await _logger.LogError(ctx, "Couldn't fetch profile").ConfigureAwait(false);
 				return;
 			}
 
-			var songPageNumber = (uint) Math.Ceiling((double) nthSong / Constants.DEFAULT_PLAYS_PER_PAGE);
+			var songPageNumber = (int) Math.Ceiling((double) nthSong / Constants.DEFAULT_PLAYS_PER_PAGE);
 			var songPage = await FetchScorePage(profile.Id, songPageNumber).ConfigureAwait(false);
 			if (songPage == null)
 			{
@@ -79,11 +73,11 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 				return;
 			}
 
-			PlayerScoreDto requestedSong;
+			data requestedSong;
 			var localSongIndex = --nthSong % Constants.DEFAULT_PLAYS_PER_PAGE;
-			if (songPage.PlayerScores.Count > localSongIndex)
+			if (songPage.Data.Count > localSongIndex)
 			{
-				requestedSong = songPage.PlayerScores[localSongIndex];
+				requestedSong = songPage.Data.ElementAt(localSongIndex);
 			}
 			else
 			{
@@ -91,7 +85,7 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 				return;
 			}
 
-			if (!requestedSong.Leaderboard.DifficultyInfo.DifficultyRaw.ParseScoreSaberDifficulty(out var characteristic, out var difficulty))
+			if (!requestedSong.Leaderboard.Difficulty.RawDifficulty.ParseScoreSaberDifficulty(out var characteristic, out var difficulty))
 			{
 				await _logger.LogError(ctx, "Failed to parse ScoreSaber difficulty").ConfigureAwait(false);
 				return;
@@ -100,20 +94,20 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 			var maxScore = requestedSong.Leaderboard.MaxScore;
 			if (maxScore <= 0)
 			{
-				var beatmap = await _beatSaverClientProvider.GetClientInstance().BeatmapByHash(requestedSong.Leaderboard.SongHash, skipCacheCheck: true).ConfigureAwait(false);
+				var beatmap = await _beatSaverClientProvider.GetClientInstance().BeatmapByHash(requestedSong.Leaderboard.Map.Hash, skipCacheCheck: true).ConfigureAwait(false);
 
 				var mappedCharacteristic = characteristic!.MapToBeatmapCharacteristic();
 				var mappedDifficulty = difficulty!.MapToBeatSaverBeatmapDifficulty();
 
 				maxScore = beatmap?.Versions
-					.FirstOrDefault(x => x.Hash == requestedSong.Leaderboard.SongHash.ToLower())?.Difficulties
+					.FirstOrDefault(x => x.Hash == requestedSong.Leaderboard.Map.Hash.ToLower())?.Difficulties
 					.FirstOrDefault(x => x.Characteristic == mappedCharacteristic && x.Difficulty == mappedDifficulty)
 					?.Notes.NotesToMaxScore() ?? 0;
 			}
 
-			var accuracy = ((float) (requestedSong.Score.BaseScore * 100) / maxScore);
-			var coverImageBytes = await ScoreSaberApiService.FetchImageFromCdn(requestedSong.Leaderboard.CoverImageUrl).ConfigureAwait(false);
-			var playerImageBytes = await ScoreSaberApiService.FetchImageFromCdn(profile.ProfilePicture).ConfigureAwait(false);
+			var accuracy = requestedSong.Score.Accuracy * 100;
+			var coverImageBytes = await ScoreSaberApiService.FetchImageFromCdn(requestedSong.Leaderboard.Map.CoverUrl).ConfigureAwait(false);
+			var playerImageBytes = await ScoreSaberApiService.FetchImageFromCdn(profile.Avatar).ConfigureAwait(false);
 
 			await using var memoryStream = new MemoryStream();
 			using (var background = new MagickImage(_backgroundImagePath))
@@ -174,7 +168,7 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 					FontStyle = FontStyleType.Bold,
 					FillColor = MagickColors.White
 				};
-				using (var titleCaption = new MagickImage($"caption:{requestedSong.Leaderboard.SongName}", titleCaptionSettings))
+				using (var titleCaption = new MagickImage($"caption:{requestedSong.Leaderboard.Map.SongName}", titleCaptionSettings))
 				{
 					background.Composite(titleCaption, 295, 50, CompositeOperator.Over);
 				}
@@ -188,13 +182,13 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 					BackgroundColor = MagickColors.Transparent,
 					FillColor = MagickColors.Gray
 				};
-				using (var authorCaption = new MagickImage($"caption:{requestedSong.Leaderboard.SongAuthorName}", authorCaptionSettings))
+				using (var authorCaption = new MagickImage($"caption:{requestedSong.Leaderboard.Map.SongAuthorName}", authorCaptionSettings))
 				{
 					background.Composite(authorCaption, 295, 155, CompositeOperator.Over);
 				}
 
 				// Difficulty color
-				using (var difficultyCaption = new MagickImage(requestedSong.Leaderboard.DifficultyInfo.Difficulty.ReturnDifficultyColor(), 195, 40))
+				using (var difficultyCaption = new MagickImage(requestedSong.Leaderboard.Difficulty.ReturnDifficultyColor(), 195, 40))
 				{
 					background.Composite(difficultyCaption, 50, 245, CompositeOperator.Over);
 				}
@@ -224,7 +218,7 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 					BackgroundColor = MagickColors.Transparent,
 					FillColor = MagickColors.Gray
 				};
-				using (var mapperCaption = new MagickImage($"caption:{requestedSong.Leaderboard.LevelAuthorName}", mapperCaptionSettings))
+				using (var mapperCaption = new MagickImage($"caption:{requestedSong.Leaderboard.Map.LevelAuthorName}", mapperCaptionSettings))
 				{
 					background.Composite(mapperCaption, 50, 280, CompositeOperator.Over);
 				}
@@ -337,7 +331,8 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 
 				timeSetCaptionSettings.FontPointsize = 35;
 				timeSetCaptionSettings.FillColor = MagickColors.White;
-				using (var timeSetCaption = new MagickImage($"label:{requestedSong.Score.TimeSet.ToDateTimeUtc().ToShortDateString()}", timeSetCaptionSettings))
+				var timeSet = DateTimeOffset.Parse(requestedSong.Score.CreatedAt);
+				using (var timeSetCaption = new MagickImage($"label:{timeSet.LocalDateTime.ToShortDateString()}", timeSetCaptionSettings))
 				{
 					background.Composite(timeSetCaption, 575, 420, CompositeOperator.Over);
 				}
@@ -347,33 +342,27 @@ namespace POI.DiscordDotNet.Commands.ChatCommands.BeatSaber
 				memoryStream.Seek(0, SeekOrigin.Begin);
 			}
 
-			var messageBuilder = new DiscordMessageBuilder()
-				.WithContent($"Woah, {profile.Name} played:")
-				.AddFile($"{profile.Name}_{SystemClock.Instance.GetCurrentInstant().ToDateTimeUtc().ToLongDateString()}.jpeg", memoryStream);
-			await ctx.Message
-				.RespondAsync(messageBuilder)
-				.ConfigureAwait(false);
+ 		var messageBuilder = new DiscordMessageBuilder()
+ 			.WithContent($"Woah, {profile.Name} played:")
+ 			.AddFile($"{profile.Name}_{SystemClock.Instance.GetCurrentInstant().ToDateTimeUtc().ToLongDateString()}.jpeg", memoryStream);
+ 		await ctx.Message
+ 			.RespondAsync(messageBuilder)
+ 			.ConfigureAwait(false);
 
-			// Getting data for the second image
-			var beatSaviorProfileData = await BeatSaviorApiService.FetchBeatSaviorPlayerData(scoreSaberId).ConfigureAwait(false);
-
-			//BeatSavior data found! (Making the second image)
-			if (beatSaviorProfileData != null)
-			{
-				var beatSaviorMatchingPlays = beatSaviorProfileData
-					.Where(song => requestedSong.Leaderboard.SongHash.Equals(song.SongId, StringComparison.InvariantCultureIgnoreCase)
-					               && requestedSong.Leaderboard.DifficultyInfo.Difficulty == song.SongDifficultyRank
-					               && !string.IsNullOrWhiteSpace(song.GameMode)
-					               && requestedSong.Leaderboard.DifficultyInfo.GameMode.Contains(song.GameMode))
-					.OrderByDescending(song => song.Trackers.ScoreTracker.Score)
-					.ToList();
-
-				if (beatSaviorMatchingPlays.Any())
-				{
-					await SendBeatSaviorMemoryStream(ctx, profile, beatSaviorMatchingPlays.FirstOrDefault()).ConfigureAwait(false);
-				}
-			}
-		}
+ 		// Getting score stats for the second image
+ 		try
+ 		{
+ 			var scoreStats = await ScoreSaberApiService.ScoreController_getScoreStats_v2Async((int) requestedSong.Score.Id).ConfigureAwait(false);
+ 			if (scoreStats != null)
+ 			{
+ 				await SendScoreStatsMemoryStream(ctx, profile, requestedSong.Score, scoreStats).ConfigureAwait(false);
+ 			}
+ 		}
+ 		catch (Exception ex)
+ 		{
+ 			_logger.LogWarning(ex, "Couldn't fetch score stats for score {ScoreId}", requestedSong.Score.Id);
+ 		}
+ 	}
 
 		private async Task SendBeatSaviorMemoryStream(CommandContext ctx, BasicProfileDto profile, SongDataDto beatSaviorSongData)
 		{
